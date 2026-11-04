@@ -60,6 +60,21 @@ class ControlledScreen:
             height=80,
         )
 
+        st.divider()
+
+        # ── Effort level ───────────────────────────────────────────────────
+        effort_level = st.radio(
+            "Analysis Effort",
+            options=["low", "medium", "high"],
+            index=1,
+            horizontal=True,
+            help=(
+                "Low — brief bullet-point summary, fastest.  "
+                "Medium — balanced report.  "
+                "High — detailed with data citations, slowest."
+            ),
+        )
+
         # ── Error feedback ─────────────────────────────────────────────────
         if st.session_state.analysis_error:
             st.error(f"Analysis failed: {st.session_state.analysis_error}")
@@ -83,5 +98,6 @@ class ControlledScreen:
                         "success_criteria": success_criteria.strip(),
                         "focus_areas":      focus_areas,
                         "context":          context.strip(),
-                    }
+                    },
+                    effort_level=effort_level,
                 )

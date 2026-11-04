@@ -31,6 +31,7 @@ class DataConnector:
         mode: str,
         goal_data: dict | None,
         bounds_data: dict | None,
+        effort_level: str = "medium",
     ) -> dict:
         """
         Primary orchestration method. Called once per analysis request.
@@ -44,6 +45,7 @@ class DataConnector:
         mode         : str           'controlled' or 'freerange'
         goal_data    : dict | None   Raw kwargs for PlaytestGoal; required if mode == 'controlled'.
         bounds_data  : dict | None   Raw kwargs for UserBounds;  required if mode == 'freerange'.
+        effort_level : str           'low' | 'medium' | 'high'  (default 'medium')
 
         Returns
         -------
@@ -69,6 +71,7 @@ class DataConnector:
             mode=mode,
             goal=goal,
             bounds=bounds,
+            effort_level=effort_level,
         )
 
         return {

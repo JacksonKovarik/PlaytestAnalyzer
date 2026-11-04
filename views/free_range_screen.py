@@ -60,6 +60,21 @@ class FreeRangeScreen:
             help="Anything the analyser should explicitly exclude.",
         )
 
+        st.divider()
+
+        # ── Effort level ───────────────────────────────────────────────────
+        effort_level = st.radio(
+            "Analysis Effort",
+            options=["low", "medium", "high"],
+            index=1,
+            horizontal=True,
+            help=(
+                "Low — brief bullet-point summary, fastest.  "
+                "Medium — balanced report.  "
+                "High — detailed with data citations, slowest."
+            ),
+        )
+
         # ── Error feedback ─────────────────────────────────────────────────
         if st.session_state.analysis_error:
             st.error(f"Analysis failed: {st.session_state.analysis_error}")
@@ -82,5 +97,6 @@ class FreeRangeScreen:
                         "scope_limit":     scope_limit.strip(),
                         "max_findings":    int(max_findings),
                         "priority_hint":   priority_hint.strip(),
-                    }
+                    },
+                    effort_level=effort_level,
                 )

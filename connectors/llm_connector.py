@@ -1,19 +1,18 @@
 """
 LLMConnector — CONNECTOR
 
-Single responsibility: package the  dataset strings plus the analysis
-parameters into a well-formed Anthropic API call and return the structured
-text report.
+Single responsibility: package the two raw dataset strings plus the analysis
+parameters into a well-formed Gemini API call and return the structured text
+report.
 
 This class knows nothing about Streamlit, session state, or file I/O.
 DataConnector is its only caller.
-
-Design note: both datasets are inlined as clearly labelled text blocks inside
-the user message.  This lets Claude see both datasets in the same context
-window for direct side-by-side comparison without needing the Files API.
 """
 
-import anthropic
+import os
+
+from google import genai
+from google.genai import types
 
 from models.playtest_goal import PlaytestGoal
 from models.user_bounds   import UserBounds
@@ -21,12 +20,37 @@ from models.user_bounds   import UserBounds
 
 class LLMConnector:
 
-    MODEL      = "claude-opus-4-8"  # highest reasoning quality for analysis tasks
-    MAX_TOKENS = 4096
+    MODEL = "gemini-3.8-flash"
+
+    # Per-level token budgets and one-line prompt directives injected into the
+    # system prompt so the model calibrates its response length accordingly.
+    _EFFORT_CONFIG = {
+        "low": {
+            "max_tokens": 2048,
+            "directive": (
+                "Be concise. Limit each report section to 2–3 bullet points. "
+                "Surface only the most critical findings. Skip minor observations."
+            ),
+        },
+        "medium": {
+            "max_tokens": 4096,
+            "directive": (
+                "Provide a balanced report. Each section should be thorough but focused. "
+                "Include the top findings with brief supporting evidence."
+            ),
+        },
+        "high": {
+            "max_tokens": 8192,
+            "directive": (
+                "Provide a thorough, detailed analysis. Cite specific rows or values "
+                "from the data for every finding. Expand each section fully."
+            ),
+        },
+    }
 
     def __init__(self):
-        # The SDK automatically reads ANTHROPIC_API_KEY from the environment.
-        self.client = anthropic.Anthropic()
+        # Reads GEMINI_API_KEY from the environment.
+        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -39,10 +63,11 @@ class LLMConnector:
         mode: str,
         goal: PlaytestGoal | None,
         bounds: UserBounds | None,
+        effort_level: str = "medium",
     ) -> str:
         """
-        Core entry point.  Dispatches to the correct prompt-builder based on
-        mode, calls the API, and returns the report as a plain string.
+        Core entry point. Dispatches to the correct prompt-builder based on
+        mode, calls the Gemini API, and returns the report as a plain string.
 
         Parameters
         ----------
@@ -52,12 +77,15 @@ class LLMConnector:
         mode          : str   'controlled' or 'freerange'
         goal          : PlaytestGoal | None  — populated in controlled mode.
         bounds        : UserBounds | None    — populated in freerange mode.
+        effort_level  : str   'low' | 'medium' | 'high'  (default 'medium')
 
         Returns
         -------
         str  The LLM's analysis report in Markdown format.
         """
-        system_prompt = self._build_system_prompt(metadata)
+        config = self._EFFORT_CONFIG.get(effort_level, self._EFFORT_CONFIG["medium"])
+
+        system_prompt = self._build_system_prompt(metadata, config["directive"])
         user_message  = self._build_user_message(
             human_content=human_content,
             agent_content=agent_content,
@@ -67,21 +95,22 @@ class LLMConnector:
             bounds=bounds,
         )
 
-        response = self.client.messages.create(
+        response = self.client.models.generate_content(
             model=self.MODEL,
-            max_tokens=self.MAX_TOKENS,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                max_output_tokens=config["max_tokens"],
+            ),
         )
-
-        return response.content[0].text
+        return response.text
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
-    def _build_system_prompt(self, metadata: dict) -> str:
+    def _build_system_prompt(self, metadata: dict, effort_directive: str) -> str:
         """
-        Establishes the LLM's persona and non-negotiable output constraints.
-        This is identical regardless of analysis mode.
+        Establishes the LLM's persona, output constraints, and effort directive.
+        The directive is the only thing that varies between effort levels.
         """
         return (
             f'You are the Comparison Engine for a game playtesting analysis system.\n\n'
@@ -96,6 +125,7 @@ class LLMConnector:
             f'3. Surface any data anomalies that suggest bugs (impossible values, missing states, etc.).\n'
             f'4. Be specific — cite evidence from the data, not general observations.\n'
             f'5. Remain objective; do not assume agent behaviour is "wrong" just because it differs.\n\n'
+            f'EFFORT LEVEL INSTRUCTION: {effort_directive}\n\n'
             f'Format your response as a structured Markdown report.'
         )
 
@@ -109,10 +139,7 @@ class LLMConnector:
         goal: PlaytestGoal | None,
         bounds: UserBounds | None,
     ) -> str:
-        """
-        Assembles the full user turn.  Task brief comes first so the model
-        reads the objectives before encountering the raw data.
-        """
+        """Task brief first so the model reads objectives before raw data."""
         task_section = (
             self._build_controlled_task(goal)
             if mode == "controlled"
@@ -122,10 +149,7 @@ class LLMConnector:
         return f"{task_section}\n\n{data_section}"
 
     def _build_data_section(self, human_content: str, agent_content: str) -> str:
-        """
-        Inlines both datasets inside XML-style fences so the model can
-        unambiguously distinguish the two sources while cross-referencing.
-        """
+        """Inlines both datasets in labelled XML-style fences for clear attribution."""
         return (
             "--- DATASET A: HUMAN PLAYTEST DATA ---\n"
             "<human_dataset>\n"
@@ -138,10 +162,6 @@ class LLMConnector:
         )
 
     def _build_controlled_task(self, goal: PlaytestGoal) -> str:
-        """
-        Controlled mode: directs the LLM to answer a specific research question.
-        PlaytestGoal.to_prompt_fragment() supplies the structured brief.
-        """
         return (
             "## Analysis Mode: CONTROLLED\n\n"
             "You have been given a specific investigation brief. Focus your entire "
@@ -158,10 +178,6 @@ class LLMConnector:
         )
 
     def _build_freerange_task(self, bounds: UserBounds) -> str:
-        """
-        Free-range mode: grants broad discovery latitude while keeping results
-        within UserBounds to prevent an unfocused wall of text.
-        """
         return (
             "## Analysis Mode: FREE-RANGE\n\n"
             "Perform open-ended discovery across both datasets. You are looking for "

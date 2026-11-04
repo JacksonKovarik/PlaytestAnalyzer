@@ -30,6 +30,7 @@ _DEFAULTS: dict = {
     "analysis_mode":  None,   # 'controlled' | 'freerange'
     "goal_data":      None,   # dict matching PlaytestGoal constructor kwargs
     "bounds_data":    None,   # dict matching UserBounds constructor kwargs
+    "effort_level":   "medium",  # 'low' | 'medium' | 'high'
     "results":        None,   # dict: { report, metadata }
     "is_analyzing":   False,
     "analysis_error": None,
@@ -113,7 +114,13 @@ class ScreenController:
         st.session_state.current_screen = mode
         st.rerun()
 
-    def run_analysis(self, *, goal_data: dict | None = None, bounds_data: dict | None = None):
+    def run_analysis(
+        self,
+        *,
+        goal_data: dict | None = None,
+        bounds_data: dict | None = None,
+        effort_level: str = "medium",
+    ):
         """
         Called by ControlledScreen or FreeRangeScreen when the user submits
         their parameters.  Stores the parameters, triggers the LLM call via
@@ -121,11 +128,13 @@ class ScreenController:
 
         Parameters
         ----------
-        goal_data   : dict | None  — required when mode == 'controlled'
-        bounds_data : dict | None  — required when mode == 'freerange'
+        goal_data    : dict | None  — required when mode == 'controlled'
+        bounds_data  : dict | None  — required when mode == 'freerange'
+        effort_level : str          'low' | 'medium' | 'high'
         """
         st.session_state.goal_data      = goal_data
         st.session_state.bounds_data    = bounds_data
+        st.session_state.effort_level   = effort_level
         st.session_state.is_analyzing   = True
         st.session_state.analysis_error = None
 
@@ -134,13 +143,14 @@ class ScreenController:
 
         try:
             result = self._connector.run_analysis(
-                human_file  = pset["human_file"],
-                agent_file  = pset["agent_file"],
-                game_name   = pset["game_name"],
-                test_date   = pset.get("test_date", ""),
-                mode        = mode,
-                goal_data   = goal_data,
-                bounds_data = bounds_data,
+                human_file   = pset["human_file"],
+                agent_file   = pset["agent_file"],
+                game_name    = pset["game_name"],
+                test_date    = pset.get("test_date", ""),
+                mode         = mode,
+                goal_data    = goal_data,
+                bounds_data  = bounds_data,
+                effort_level = effort_level,
             )
             st.session_state.results        = result
             st.session_state.is_analyzing   = False
