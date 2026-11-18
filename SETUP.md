@@ -10,7 +10,7 @@ source .venv/bin/activate
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Set your Anthropic API key
+# 3. Set your OpenAI API key
 cp .env.example .env
 # Edit .env and paste your key
 
@@ -33,7 +33,7 @@ Phase2/
 │   ├── playtest_goal.py            # PlaytestGoal — Controlled mode parameters
 │   └── user_bounds.py              # UserBounds — Free-Range mode parameters
 ├── connectors/
-│   └── llm_connector.py            # LLMConnector — Anthropic API calls
+│   └── llm_connector.py            # LLMConnector — OpenAI Codex API calls
 └── views/
     ├── upload_screen.py
     ├── selection_screen.py
@@ -46,5 +46,5 @@ Phase2/
 
 Both human and agentic dataset files can be: `.txt`, `.csv`, `.json`, `.log`
 
-The files are read as UTF-8 text and sent directly to Claude as inline content.
+The files are read as UTF-8 text and sent directly to the model as inline content.
 No local parsing is performed.

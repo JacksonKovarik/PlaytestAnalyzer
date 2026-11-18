@@ -1,6 +1,6 @@
 # PlaytestAnalyzer
 
-A game playtesting analysis tool that compares **human playtester data** against **agentic (AI) playtester data** to identify strategic differences, exploits, and bugs — powered by Claude.
+A game playtesting analysis tool that compares **human playtester data** against **agentic (AI) playtester data** to identify strategic differences, exploits, and bugs — powered by OpenAI Codex.
 
 ## What it does
 
@@ -32,13 +32,13 @@ Phase2/
 │   ├── playtest_goal.py        # Controlled mode parameters
 │   └── user_bounds.py          # Free-Range mode parameters
 ├── connectors/
-│   └── llm_connector.py        # Anthropic API calls + prompt construction
+│   └── llm_connector.py        # OpenAI Codex API calls + prompt construction
 └── views/                      # One file per screen (5 screens total)
 ```
 
 ## Getting started
 
-**Prerequisites:** Python 3.11+, an [Anthropic API key](https://console.anthropic.com/)
+**Prerequisites:** Python 3.11+, an [OpenAI API key](https://platform.openai.com/api-keys)
 
 ```bash
 # 1. Clone the repo
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 
 # 4. Add your API key
 cp .env.example .env
-# Open .env and set: ANTHROPIC_API_KEY=your_key_here
+# Open .env and set: OPENAI_API_KEY=your_key_here
 
 # 5. Run the app
 streamlit run app.py
@@ -65,7 +65,7 @@ The app opens at **http://localhost:8501**
 ## Accepted dataset formats
 
 Both the human and agentic dataset files can be `.txt`, `.csv`, `.json`, or `.log`.  
-The files are read as UTF-8 text and sent directly to Claude — no local parsing is performed.
+The files are read as UTF-8 text and sent directly to the model — no local parsing is performed.
 
 ## Future plans
 

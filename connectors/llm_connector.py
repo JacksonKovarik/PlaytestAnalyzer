@@ -2,7 +2,7 @@
 LLMConnector — CONNECTOR
 
 Single responsibility: package the two raw dataset strings plus the analysis
-parameters into a well-formed Gemini API call and return the structured text
+parameters into a well-formed OpenAI Codex API call and return the structured text
 report.
 
 This class knows nothing about Streamlit, session state, or file I/O.
@@ -11,8 +11,7 @@ DataConnector is its only caller.
 
 import os
 
-from google import genai
-from google.genai import types
+from openai import OpenAI
 
 from models.playtest_goal import PlaytestGoal
 from models.user_bounds   import UserBounds
@@ -20,27 +19,33 @@ from models.user_bounds   import UserBounds
 
 class LLMConnector:
 
-    MODEL = "gemini-3.8-flash"
+    # Override with OPENAI_MODEL in .env to try a different Codex model.
+    MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-codex")
 
-    # Per-level token budgets and one-line prompt directives injected into the
-    # system prompt so the model calibrates its response length accordingly.
+    # Per-level token budgets, reasoning effort, and one-line prompt directives
+    # injected into the system prompt so the model calibrates its response.
+    # Note: for Codex (reasoning) models, max_tokens covers reasoning tokens
+    # AND visible output, so budgets are larger than for non-reasoning models.
     _EFFORT_CONFIG = {
         "low": {
-            "max_tokens": 2048,
+            "max_tokens": 4096,
+            "reasoning": "low",
             "directive": (
                 "Be concise. Limit each report section to 2–3 bullet points. "
                 "Surface only the most critical findings. Skip minor observations."
             ),
         },
         "medium": {
-            "max_tokens": 4096,
+            "max_tokens": 8192,
+            "reasoning": "medium",
             "directive": (
                 "Provide a balanced report. Each section should be thorough but focused. "
                 "Include the top findings with brief supporting evidence."
             ),
         },
         "high": {
-            "max_tokens": 8192,
+            "max_tokens": 16384,
+            "reasoning": "high",
             "directive": (
                 "Provide a thorough, detailed analysis. Cite specific rows or values "
                 "from the data for every finding. Expand each section fully."
@@ -49,8 +54,8 @@ class LLMConnector:
     }
 
     def __init__(self):
-        # Reads GEMINI_API_KEY from the environment.
-        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        # Reads OPENAI_API_KEY from the environment.
+        self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -67,7 +72,7 @@ class LLMConnector:
     ) -> str:
         """
         Core entry point. Dispatches to the correct prompt-builder based on
-        mode, calls the Gemini API, and returns the report as a plain string.
+        mode, calls the OpenAI Responses API, and returns the report as a plain string.
 
         Parameters
         ----------
@@ -95,15 +100,14 @@ class LLMConnector:
             bounds=bounds,
         )
 
-        response = self.client.models.generate_content(
+        response = self.client.responses.create(
             model=self.MODEL,
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                max_output_tokens=config["max_tokens"],
-            ),
+            instructions=system_prompt,
+            input=user_message,
+            max_output_tokens=config["max_tokens"],
+            reasoning={"effort": config["reasoning"]},
         )
-        return response.text
+        return response.output_text
 
     # ── Private helpers ───────────────────────────────────────────────────────
 

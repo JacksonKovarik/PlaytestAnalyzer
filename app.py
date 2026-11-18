@@ -9,7 +9,7 @@ Run:  streamlit run app.py
 
 from dotenv import load_dotenv
 
-load_dotenv()  # loads ANTHROPIC_API_KEY from .env before any Anthropic SDK import
+load_dotenv()  # loads OPENAI_API_KEY from .env before any OpenAI SDK import
 
 from controllers.screen_controller import ScreenController  # noqa: E402 (must be after load_dotenv)
 
